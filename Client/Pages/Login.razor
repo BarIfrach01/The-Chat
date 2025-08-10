@@ -1,0 +1,169 @@
+@page "/"
+@page "/Login"
+@using Programmin2_classroom.Shared.Models
+@inject IJSRuntime JS
+@inject HttpClient Http
+@inject NavigationManager Nav
+
+<div class="login-background">
+    <div class="login-container">
+        @if (isLoginMode)
+        {
+            <h2 class="login-title">התחברות</h2>
+        }
+        else
+        {
+            <h2 class="login-title">הרשמה</h2>
+        }
+
+        <form @onsubmit="HandleEnter">
+            @if (isLoginMode)
+            {
+                <div class="form-group">
+                    <label class="form-label">שם משתמש:</label>
+                    <input type="text" @bind="loginDetails.Username" class="form-input"/>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">סיסמה:</label>
+                    <input type="password" @bind="loginDetails.Password" class="form-input"/>
+                </div>
+
+                <button type="submit" class="login-button">כניסה</button>
+
+                <div class="switch-mode">
+                    אין לך חשבון?
+                    <span class="switch-link" @onclick="SwitchToRegister">הרשמה</span>
+                </div>
+            }
+            else
+            {
+                <div class="form-group">
+                    <label class="form-label">שם משתמש:</label>
+                    <input type="text" @bind="registerDetails.Username" class="form-input"/>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">סיסמה:</label>
+                    <input type="password" @bind="registerDetails.Password" class="form-input"/>
+                </div>
+
+                <button type="submit" class="login-button">הרשמה</button>
+
+                <div class="switch-mode">
+                    <span class="switch-link" @onclick="SwitchToLogin">כבר יש לי חשבון</span>
+                </div>
+            }
+        </form>
+
+        @if (!string.IsNullOrEmpty(message))
+        {
+            <div class="message @(message.Contains("בהצלחה") || message.Contains("נרשמת") ? "success" : "error")">
+                @message
+            </div>
+        }
+    </div>
+</div>
+
+@code {
+    private bool isLoginMode = true;
+    private bool isLoginSuccess;
+    private LoginDetails loginDetails = new();
+    private LoginDetails registerDetails = new();
+
+    private string message;
+
+    private async Task HandleLogin()
+    {
+        message = "";
+        isLoginSuccess = false;
+
+        if (string.IsNullOrWhiteSpace(loginDetails.Username) || string.IsNullOrWhiteSpace(loginDetails.Password))
+        {
+            message = "אין להשאיר שדות ריקים";
+            return;
+        }
+
+        var response = await Http.PostAsJsonAsync("api/auth/login", loginDetails);
+
+        if (response.IsSuccessStatusCode)
+        {
+            // קריאת התגובה החדשה עם הטוקן
+            var loginResponse = await response.Content.ReadFromJsonAsync<LoginResponse>();
+
+            // שמירת הנתונים ב-localStorage
+            await JS.InvokeVoidAsync("localStorage.setItem", "username", loginResponse.Username);
+            await JS.InvokeVoidAsync("localStorage.setItem", "isAdmin", loginResponse.IsAdmin.ToString().ToLower());
+            await JS.InvokeVoidAsync("localStorage.setItem", "jwtToken", loginResponse.Token);
+
+            message = "התחברת בהצלחה!";
+            isLoginSuccess = true;
+            loginDetails = new();
+            
+            Nav.NavigateTo($"/chat/{loginResponse.Username}");
+        }
+        else if (response.StatusCode == System.Net.HttpStatusCode.Unauthorized)
+        {
+            message = "שם המשתמש או הסיסמה אינם נכונים";
+        }
+        else
+        {
+            message = "שגיאה בשרת, נסה שוב מאוחר יותר";
+        }
+    }
+
+    private async Task HandleRegister()
+    {
+        message = "";
+        isLoginSuccess = false;
+
+        if (string.IsNullOrWhiteSpace(registerDetails.Username) || string.IsNullOrWhiteSpace(registerDetails.Password))
+        {
+            message = "אין להשאיר שדות ריקים";
+            return;
+        }
+
+        var response = await Http.PostAsJsonAsync("api/auth/register", registerDetails);
+
+        if (response.IsSuccessStatusCode)
+        {
+            isLoginMode = true;
+            registerDetails = new();
+            message = "נרשמת בהצלחה! עכשיו אפשר להתחבר";
+        }
+        else if (response.StatusCode == System.Net.HttpStatusCode.BadRequest)
+        {
+            var errorContent = await response.Content.ReadAsStringAsync();
+            message = errorContent.Trim('"'); // הסרת גרשיים מהתגובה
+        }
+        else
+        {
+            message = "שגיאה בשרת, נסה שוב מאוחר יותר";
+        }
+    }
+
+    private async Task HandleEnter()
+    {
+        if (isLoginMode)
+            await HandleLogin();
+        else
+            await HandleRegister();
+    }
+
+    private void SwitchToLogin()
+    {
+        isLoginMode = true;
+        if (!isLoginSuccess)
+            message = "";
+        registerDetails = new();
+    }
+
+    private void SwitchToRegister()
+    {
+        isLoginMode = false;
+        if (!isLoginSuccess)
+            message = "";
+        loginDetails = new();
+    }
+    
+}

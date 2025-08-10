@@ -1,0 +1,166 @@
+/* דף אודיט */
+.audit-background {
+    min-height: 100vh;
+    background-color: #0B0B23;
+    padding: 20px 0;
+}
+
+.audit-main-container {
+    display: flex;
+    justify-content: center;
+    width: 100%;
+    max-width: 1400px;
+    margin: 0 auto;
+    padding: 0 20px;
+}
+
+.audit-content {
+    flex: 1;
+    max-width: 1200px;
+    background-color: #0B0B23;
+    border-radius: 16px;
+    padding: 5px;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+}
+
+.audit-title {
+    color: #99BED0;
+    font-weight: bold;
+    font-size: 2rem;
+    margin-bottom: 30px;
+    text-align: center;
+}
+
+/* טבלת לוגים */
+.logs-container {
+    background-color: rgba(255, 255, 255, 0.08);
+    border-radius: 12px;
+    
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    padding: 20px 20px 20px 35px;
+}
+
+.table-wrapper {
+    overflow-x: auto;
+    overflow-y: auto;
+    max-height: 70vh;
+    border-radius: 8px;
+    direction: ltr;
+    padding-right: 16px;
+  
+}
+
+.logs-table {
+    width: 100%;
+    border-collapse: collapse;
+    background-color: transparent;
+    direction: rtl;
+    
+}
+
+.table-header {
+    position: sticky;
+    top: 0;
+    background-color: #252339;
+    z-index: 10;
+}
+
+.table-th {
+    padding: 16px 20px;
+    background-color: #252339;
+    color: #99BED0;
+    font-weight: bold;
+    font-size: 1rem;
+    text-align: right;
+    border-bottom: 2px solid rgba(153, 190, 208, 0.3);
+    border-right: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.table-th:first-child {
+    border-right: none;
+    border-top-right-radius: 8px;
+}
+
+.table-th:last-child {
+    border-top-left-radius: 8px;
+}
+
+.table-body {
+    background-color: transparent;
+}
+
+.table-row {
+    transition: background-color 0.2s ease;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+
+.table-row:last-child {
+    border-bottom: none;
+}
+
+.table-td {
+    padding: 14px 20px;
+    color: #F6F9F9;
+    font-size: 0.9rem;
+    vertical-align: middle;
+    border-right: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.table-td:first-child {
+    border-right: none;
+}
+
+.username-cell {
+    color: #F6F9F9;
+    font-weight: 500;
+}
+
+.action-cell {
+    color: #F6F9F9;
+}
+
+.time-cell {
+    color: rgba(246, 249, 249, 0.8);
+    font-size: 0.85rem;
+}
+
+
+.loading-text, .no-permission, .no-logs {
+    text-align: center;
+    color: #F6F9F9;
+    font-size: 1.1rem;
+    padding: 60px 20px;
+    background-color: rgba(255, 255, 255, 0.08);
+    border-radius: 12px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.no-permission {
+    color: #ff9999;
+}
+
+/* גלילה עבור הטבלה */
+.table-wrapper::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+}
+
+.table-wrapper::-webkit-scrollbar-track {
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 4px;
+    margin-top: 60px;
+   margin-bottom: 10px;
+    
+}
+
+.table-wrapper::-webkit-scrollbar-thumb {
+    background: rgba(153, 190, 208, 0.7);
+    border-radius: 4px;
+}
+
+.table-wrapper::-webkit-scrollbar-thumb:hover {
+    background: rgba(153, 190, 208, 0.9);
+}
+
+

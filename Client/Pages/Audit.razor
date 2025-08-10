@@ -1,0 +1,147 @@
+@page "/audit"
+@using Programmin2_classroom.Shared.Models
+@using System.Net.Http.Headers
+@inject HttpClient Http
+@inject NavigationManager Nav
+@inject IJSRuntime JS
+
+<div class="audit-background">
+    <div class="audit-main-container">
+        <div class="audit-content">
+            <h2 class="audit-title">רשימת לוגים</h2>
+
+            @if (loading)
+            {
+                <p class="loading-text">טוען לוגים...</p>
+            }
+            else if (!isAdmin)
+            {
+                <p class="no-permission">אין לך הרשאה לצפות בלוגים. מעביר לדף הבית...</p>
+            }
+            else if (logs == null || logs.Count == 0)
+            {
+                <p class="no-logs">אין פעולות שנשמרו בלוג.</p>
+            }
+            else
+            {
+                <div class="logs-container">
+                    <div class="table-wrapper">
+                        <table class="logs-table">
+                            <thead class="table-header">
+                            <tr>
+                                <th class="table-th">שם משתמש</th>
+                                <th class="table-th">פעולה</th>
+                                <th class="table-th">תאריך ושעה</th>
+                            </tr>
+                            </thead>
+                            <tbody class="table-body">
+                            @foreach (var log in logs)
+                            {
+                                <tr class="table-row">
+                                    <td class="table-td username-cell">@log.Username</td>
+                                    <td class="table-td action-cell">@log.Action</td>
+                                    <td class="table-td time-cell">@log.TimeAction.ToString("dd/MM/yyyy HH:mm")</td>
+                                </tr>
+                            }
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            }
+        </div>
+    </div>
+</div>
+
+@code {
+    private List<AuditLog> logs;
+    private string username;
+    private bool isAdmin = false;
+    private bool loading = true;
+    private string jwtToken = "";
+
+    // הגדרת JWT Token ב-HttpClient
+    private async Task SetupHttpClientWithAuth()
+    {
+        jwtToken = await JS.InvokeAsync<string>("localStorage.getItem", "jwtToken");
+        if (!string.IsNullOrEmpty(jwtToken))
+        {
+            Http.DefaultRequestHeaders.Authorization = 
+                new AuthenticationHeaderValue("Bearer", jwtToken);
+        }
+    }
+
+    // טיפול באי-הרשאה
+    private async Task HandleUnauthorized()
+    {
+        await JS.InvokeVoidAsync("localStorage.clear");
+        Nav.NavigateTo("/");
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        // שליפת הנתונים מ-localStorage
+        username = await JS.InvokeAsync<string>("localStorage.getItem", "username");
+        string isAdminStr = await JS.InvokeAsync<string>("localStorage.getItem", "isAdmin");
+
+        isAdmin = isAdminStr == "true";
+
+        // בדיקה שהמשתמש מחובר ואדמין
+        if (string.IsNullOrEmpty(username))
+        {
+            Nav.NavigateTo("/");
+            return;
+        }
+
+        if (!isAdmin)
+        {
+            // מעבר אוטומטי לדף הצ'אט אם לא אדמין
+            Nav.NavigateTo($"/chat/{username}");
+            return;
+        }
+
+        // הגדרת JWT Token
+        await SetupHttpClientWithAuth();
+
+        try
+        {
+            // קריאה חדשה לAPI - עכשיו עם GET בלבד (ללא Body)
+            var response = await Http.GetAsync("api/chat/audit");
+
+            if (response.IsSuccessStatusCode)
+            {
+                logs = await response.Content.ReadFromJsonAsync<List<AuditLog>>();
+            }
+            else if (response.StatusCode == System.Net.HttpStatusCode.Unauthorized)
+            {
+                await HandleUnauthorized();
+                return;
+            }
+            else if (response.StatusCode == System.Net.HttpStatusCode.Forbidden)
+            {
+                // אין הרשאת אדמין
+                Nav.NavigateTo($"/chat/{username}");
+                return;
+            }
+            else
+            {
+                logs = new List<AuditLog>();
+                Console.WriteLine($"Error loading audit logs: {response.StatusCode}");
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Exception loading audit logs: {ex.Message}");
+            
+            // אם יש בעיה עם הטוקן
+            if (ex.Message.Contains("401") || ex.Message.Contains("Unauthorized"))
+            {
+                await HandleUnauthorized();
+                return;
+            }
+            
+            logs = new List<AuditLog>();
+        }
+
+        loading = false;
+    }
+}

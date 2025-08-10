@@ -1,0 +1,135 @@
+﻿@inherits LayoutComponentBase
+@inject NavigationManager NavigationManager
+@inject HttpClient Http
+@inject IJSRuntime JS
+
+
+<div class="page">
+    <main>
+        @if (!IsLoginPage())
+        {
+            <div class="top-row navbar-container">
+                <div class="right-section">
+                    <span class="username-display">@username</span>
+                    <span class="separator">|</span>
+                    <button @onclick="Logout" class="logout-button">התנתקות</button>
+                </div>
+                <div class="left-section">
+                    @if (isAdmin)
+                    {
+                    <div class="audit-button">
+                        @if (IsAuditPage())
+                        {
+                        <button @onclick="NavigateToChat" class="navigation-link">חזרה לצ'אט</button>
+                        }
+                        else
+                        {
+                        <a href="/audit" class="navigation-link">מעבר לדף Audit</a>
+                        }
+                    </div>
+                    }
+                </div>
+            </div>
+        }
+
+        <article class="content px-4">
+            @Body
+        </article>
+    </main>
+
+</div>
+
+@code {
+    private string username = "אורח";
+    private bool isAdmin = false;
+    private bool hasRendered = false;
+
+   // עליית העמוד
+    protected override async Task OnInitializedAsync()
+    {
+        // בדיקה לשינויי ניווט
+        NavigationManager.LocationChanged += OnLocationChanged;
+        await UpdateUserInfo();
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender || !hasRendered)
+        {
+            await UpdateUserInfo();
+            hasRendered = true;
+        }
+    }
+
+    // במעבר לדף אחר
+    private async void OnLocationChanged(object sender, Microsoft.AspNetCore.Components.Routing.LocationChangedEventArgs e)
+    {
+        await UpdateUserInfo();
+        await InvokeAsync(StateHasChanged);
+    }
+
+    // שולף את פרטי המשתמש ומעדכן בהתאם
+    private async Task UpdateUserInfo()
+    {
+        try
+        {
+            var storedUsername = await JS.InvokeAsync<string>("localStorage.getItem", "username");
+            var isAdminStr = await JS.InvokeAsync<string>("localStorage.getItem", "isAdmin");
+
+            username = storedUsername ?? "אורח";
+            isAdmin = isAdminStr == "true";
+
+            StateHasChanged();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error updating user info: {ex.Message}");
+        }
+    }
+
+    // בודק אם זה דף הכניסה כדי לא להציג את התפריט העליון
+    private bool IsLoginPage()
+    {
+        var currentUrl = NavigationManager.ToBaseRelativePath(NavigationManager.Uri);
+        return string.IsNullOrEmpty(currentUrl) || currentUrl == "Login";
+    }
+
+    // ניתוק המשתמש וחזרה לדף הכניסה
+    private async Task Logout()
+    {
+        // שליחת בקשה לשרת לעדכן שהמשתמש לא מחובר
+        await Http.PostAsJsonAsync("api/chat/logout", new { Username = username });
+
+        // ניקוי LocalStorage
+        await JS.InvokeVoidAsync("localStorage.removeItem", "username");
+        await JS.InvokeVoidAsync("localStorage.removeItem", "isAdmin");
+
+        // עדכון המשתנים המקומיים
+        username = "אורח";
+        isAdmin = false;
+
+        // ניתוב חזרה לעמוד הכניסה
+        NavigationManager.NavigateTo("/Login", forceLoad: true);
+    }
+
+    // בודק אם זה דף הלוגים
+    private bool IsAuditPage()
+    {
+        var currentUrl = NavigationManager.ToBaseRelativePath(NavigationManager.Uri);
+        return currentUrl.StartsWith("audit", StringComparison.OrdinalIgnoreCase);
+    }
+
+    // מנווט חזרה לדף הצאט 
+    private void NavigateToChat()
+    {
+        NavigationManager.NavigateTo($"/chat/{username}");
+    }
+
+    // ניקוי בדיקת הניווט
+    public void Dispose()
+    {
+        NavigationManager.LocationChanged -= OnLocationChanged;
+    }
+
+
+}

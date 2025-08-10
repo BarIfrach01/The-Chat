@@ -1,0 +1,420 @@
+@using Microsoft.AspNetCore.SignalR.Client
+@implements IAsyncDisposable
+@using Programmin2_classroom.Shared.Models
+@using System.Net.Http.Headers
+@inject HttpClient Http
+@inject NavigationManager NavigationManager
+@inject IJSRuntime JS
+@page "/chat/{username}"
+
+<div class="chat-background">
+    <div class="chat-main-container">
+        <!-- Chat content area -->
+        <div class="chat-content">
+            <div class="chat-header">
+                <h2 class="chat-title">צ'אט</h2>
+            </div>
+
+            <!-- Filter section -->
+            <div class="filter-container">
+                <h4 class="filter-title">סינון הודעות</h4>
+                <div class="filter-controls">
+                    <div class="filter-field">
+                        <label class="filter-label">תוכן ההודעה</label>
+                        <input placeholder="חיפוש " @bind="searchText" class="filter-input"/>
+                    </div>
+                    <div class="filter-field">
+                        <label class="filter-label">מתאריך</label>
+                        <input type="datetime-local" @bind="startDate" class="filter-input"/>
+                    </div>
+                    <div class="filter-field">
+                        <label class="filter-label">עד תאריך</label>
+                        <input type="datetime-local" @bind="endDate" class="filter-input"/>
+                    </div>
+                    <div class="filter-buttons">
+                        <button @onclick="ApplyFilter" class="filter-button">חיפוש</button>
+                        <button @onclick="ClearFilter" class="clear-button">נקה חיפוש</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Messages area -->
+            <div class="messages-container" id="messages-scroll">
+                @if (messages == null)
+                {
+                    <p class="loading-text">טוען הודעות...</p>
+                }
+                else if (messages.Count == 0)
+                {
+                    <p class="no-messages">אין עדיין הודעות.</p>
+                }
+                else
+                {
+                    <ul class="messages-list">
+                        @foreach (var msg in messages)
+                        {
+                            <li class="message-item">
+                                @if (isEditing && editingMessageId == msg.Id)
+                                {
+                                    <div class="edit-message">
+                                        <input @bind="editingText" class="edit-input"/>
+                                        <div class="edit-buttons">
+                                            <button @onclick="SaveEdit" class="save-button">שמירה</button>
+                                            <button @onclick="CancelEdit" class="cancel-button">ביטול</button>
+                                        </div>
+                                    </div>
+                                }
+                                else
+                                {
+                                    <div class="message-content">
+                                        <div class="message-main">
+                                            <div class="message-header">
+                                                <span class="message-username">@msg.Username</span>
+                                                <span class="message-time">@msg.CreatedAt.ToString("g")</span>
+                                            </div>
+                                            <div class="message-text">@msg.Text</div>
+                                        </div>
+
+                                        @if (msg.Username == username)
+                                        {
+                                            <div class="message-actions">
+                                                <button @onclick="() => StartEdit(msg)" class="icon-button edit-icon" title="עריכת הודעה"></button>
+                                                <button @onclick="() => DeleteMessage(msg.Id)" class="icon-button delete-icon" title="מחיקת הודעה"></button>
+                                            </div>
+                                        }
+                                    </div>
+                                }
+                            </li>
+                        }
+                    </ul>
+                }
+            </div>
+
+            <!-- Fixed add message section -->
+            <div class="add-message-container">
+                <h4 class="add-message-title">הוספת הודעה</h4>
+                <div class="add-message-controls">
+                    <input placeholder="כתוב הודעה..." @bind="newMessageText" class="message-input"/>
+                    <button @onclick="AddMessage" class="send-button">שליחה</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Users sidebar -->
+        <div class="users-sidebar">
+            <div class="users-container">
+                <h4 class="users-title">משתמשים מחוברים</h4>
+
+                @if (users == null)
+                {
+                    <p class="loading-text">טוען רשימת משתמשים...</p>
+                }
+                else
+                {
+                    <ul class="users-list">
+                        @foreach (var user in users.OrderByDescending(u => u.IsOnline).ThenBy(u => u.Username))
+                        {
+                            <li class="user-item">
+                                <span class="user-name">@user.Username</span>
+                                @if (user.IsOnline)
+                                {
+                                    <span class="status-online">●</span>
+                                }
+                                else
+                                {
+                                    <span class="status-offline">○</span>
+                                }
+                            </li>
+                        }
+                    </ul>
+                }
+            </div>
+        </div>
+    </div>
+</div>
+
+@code {
+    private List<MessageDetails> messages;
+    private string newMessageText = "";
+    private int editingMessageId = -1;
+    private string editingText = "";
+    private bool isEditing = false;
+
+    private string searchText = "";
+    private DateTime startDate = DateTime.Today.AddDays(-1);
+    private DateTime endDate = DateTime.Today;
+
+    private HubConnection hubConnection;
+    private bool isAdmin = false;
+    private string jwtToken = "";
+
+    [Parameter] public string username { get; set; }
+    private List<UserStatus> users;
+
+// הגדרת JWT Token ב-HttpClient
+    private async Task SetupHttpClientWithAuth()
+    {
+        jwtToken = await JS.InvokeAsync<string>("localStorage.getItem", "jwtToken");
+        if (!string.IsNullOrEmpty(jwtToken))
+        {
+            Http.DefaultRequestHeaders.Authorization =
+                new AuthenticationHeaderValue("Bearer", jwtToken);
+        }
+    }
+
+// עליית העמוד
+    protected override async Task OnInitializedAsync()
+    {
+// שליפת נתונים מ-localStorage
+        string savedUsername = await JS.InvokeAsync<string>("localStorage.getItem", "username");
+        string isAdminStr = await JS.InvokeAsync<string>("localStorage.getItem", "isAdmin");
+
+        isAdmin = isAdminStr == "true";
+
+// בדיקה שהמשתמש מחובר
+        if (string.IsNullOrEmpty(savedUsername))
+        {
+            NavigationManager.NavigateTo("/");
+            return;
+        }
+
+// הגדרת JWT Token
+        await SetupHttpClientWithAuth();
+
+        try
+        {
+// טעינת נתונים ראשונית
+            await LoadMessages();
+            await LoadUsers();
+
+// הגדרת SignalR
+            hubConnection = new HubConnectionBuilder()
+                .WithUrl(NavigationManager.ToAbsoluteUri("/chathub"))
+                .Build();
+
+            hubConnection.On("NotifyUpdate", async () =>
+            {
+                await InvokeAsync(async () =>
+                {
+                    await LoadMessages();
+                    await LoadUsers();
+                    StateHasChanged();
+                });
+            });
+
+            await hubConnection.StartAsync();
+        }
+        catch (UnauthorizedAccessException)
+        {
+// אם הטוקן לא תקף, חזור לדף התחברות
+            await JS.InvokeVoidAsync("localStorage.clear");
+            NavigationManager.NavigateTo("/");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error initializing chat: {ex.Message}");
+        }
+    }
+
+// חיבור להאב
+    public async Task NotifyUpdate()
+    {
+        if (hubConnection?.State == HubConnectionState.Connected)
+        {
+            await hubConnection.SendAsync("NotifyUpdate");
+        }
+    }
+
+// הוספת הודעה 
+    private async Task AddMessage()
+    {
+        if (string.IsNullOrWhiteSpace(newMessageText))
+            return;
+
+        try
+        {
+            var dto = new { Text = newMessageText };
+            var response = await Http.PostAsJsonAsync("api/chat/add", dto);
+
+            if (response.IsSuccessStatusCode)
+            {
+                newMessageText = "";
+                await NotifyUpdate();
+                await LoadMessages();
+            }
+            else if (response.StatusCode == System.Net.HttpStatusCode.Unauthorized)
+            {
+                await HandleUnauthorized();
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error adding message: {ex.Message}");
+        }
+    }
+
+// טעינת הודעות
+    private async Task LoadMessages()
+    {
+        try
+        {
+            messages = await Http.GetFromJsonAsync<List<MessageDetails>>("api/chat/messages");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error loading messages: {ex.Message}");
+            if (ex.Message.Contains("401") || ex.Message.Contains("Unauthorized"))
+            {
+                await HandleUnauthorized();
+            }
+        }
+    }
+
+// טעינת משתמשים
+    private async Task LoadUsers()
+    {
+        try
+        {
+            users = await Http.GetFromJsonAsync<List<UserStatus>>("api/chat/users");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error loading users: {ex.Message}");
+        }
+    }
+
+// טיפול באי-הרשאה
+    private async Task HandleUnauthorized()
+    {
+        await JS.InvokeVoidAsync("localStorage.clear");
+        NavigationManager.NavigateTo("/");
+    }
+
+// עריכת הודעה
+    private void StartEdit(MessageDetails msg)
+    {
+        isEditing = true;
+        editingMessageId = msg.Id;
+        editingText = msg.Text;
+    }
+
+// שמירת עריכה
+    private async Task SaveEdit()
+    {
+        try
+        {
+            var dto = new { MessageId = editingMessageId, NewText = editingText };
+            var response = await Http.PutAsJsonAsync("api/chat/edit", dto);
+
+            if (response.IsSuccessStatusCode)
+            {
+// איפוס מצב עריכה
+                isEditing = false;
+                editingMessageId = -1;
+                editingText = "";
+                await NotifyUpdate();
+                await LoadMessages();
+            }
+            else if (response.StatusCode == System.Net.HttpStatusCode.Unauthorized)
+            {
+                await HandleUnauthorized();
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error editing message: {ex.Message}");
+        }
+    }
+
+// ביטול עריכה
+    private void CancelEdit()
+    {
+        isEditing = false;
+        editingMessageId = -1;
+        editingText = "";
+    }
+
+// מחיקת הודעה   
+    private async Task DeleteMessage(int messageId)
+    {
+        try
+        {
+            var response = await Http.DeleteAsync($"api/chat/delete/{messageId}");
+
+            if (response.IsSuccessStatusCode)
+            {
+                await NotifyUpdate();
+                await LoadMessages();
+            }
+            else if (response.StatusCode == System.Net.HttpStatusCode.Unauthorized)
+            {
+                await HandleUnauthorized();
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error deleting message: {ex.Message}");
+        }
+    }
+
+// סינון הודעות
+    private async Task ApplyFilter()
+    {
+        try
+        {
+            var filter = new MessageFilter
+            {
+                Text = searchText,
+                From = startDate,
+                To = endDate
+            };
+
+            var response = await Http.PostAsJsonAsync("api/chat/messages/filter", filter);
+            if (response.IsSuccessStatusCode)
+            {
+                messages = await response.Content.ReadFromJsonAsync<List<MessageDetails>>();
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error filtering messages: {ex.Message}");
+        }
+    }
+
+// ניקוי סינון
+    private async Task ClearFilter()
+    {
+        searchText = "";
+        startDate = DateTime.Today.AddDays(-1);
+        endDate = DateTime.Today;
+        await LoadMessages(); // טעינה מחדש של כל ההודעות
+    }
+
+// התנתקות
+    private async Task Logout()
+    {
+        try
+        {
+            await Http.PostAsync("api/chat/logout", null);
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error during logout: {ex.Message}");
+        }
+        finally
+        {
+            await JS.InvokeVoidAsync("localStorage.clear");
+            NavigationManager.NavigateTo("/");
+        }
+    }
+
+// ביטול חיבור להאב בעזיבת הדף
+    public async ValueTask DisposeAsync()
+    {
+        if (hubConnection is not null)
+        {
+            await hubConnection.DisposeAsync();
+        }
+    }
+
+}

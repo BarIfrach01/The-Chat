@@ -1,0 +1,111 @@
+
+
+.login-container {
+    background-color: rgba(255, 255, 255, 0.2);
+    border-radius: 16px;
+    padding: 60px;
+    padding-left: 80px;
+    padding-right: 80px;
+    margin-top: 80px;
+    width: 550px;
+    height: 550px;
+    max-width: 90%;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    display: block;
+    margin-left: auto;
+    margin-right: auto;
+}
+
+.login-title {
+    color: #99BED0;
+    font-weight: bold;
+    font-size: 2rem;
+    text-align: center;
+    margin-bottom: 2rem;
+}
+
+.form-group {
+    margin-bottom: 1.5rem;
+}
+
+.form-label {
+    color: #F6F9F9;
+    display: block;
+    margin-bottom: 0.5rem;
+    font-size: 1rem;
+}
+
+.form-input {
+    width: 100%;
+    padding: 0.75rem;
+    border: 1px solid #ddd;
+    border-radius: 8px;
+    font-size: 1rem;
+    box-sizing: border-box;
+}
+
+.form-input:focus {
+    outline: none;
+    border-color: #0B0B23;
+    box-shadow: 0 0 0 2px rgba(11, 11, 35, 0.2);
+}
+
+.login-button {
+    width: 50%;
+    padding: 0.75rem;
+    background-color: #99BED0;
+    color: #0B0B23;
+    border: 2px solid #0B0B23; 
+    border-radius: 12px;
+    font-size: 1rem;
+    display: block;
+    font-weight: bold;
+    margin-left: auto;
+    margin-right: auto;
+    cursor: pointer;
+    margin-top: 50px;
+    margin-bottom: 1rem;
+    transition: background-color 0.3s ease, border-width 0.3s ease;
+}
+
+.login-button:hover {
+    background-color: #B3D4E3;
+    
+}
+
+
+.switch-mode {
+    text-align: center;
+    margin: 1rem;
+    color: #F6F9F9;
+}
+
+.switch-link {
+    color: #F6F9F9;
+    text-decoration: underline;
+    cursor: pointer;
+    font-size: 0.9rem;
+}
+
+.switch-link:hover {
+    color: #99BED0;
+}
+
+
+.message {
+
+    text-align: center;
+    font-size: 0.9rem;
+}
+
+.message.success {
+    
+    color: #9EB89E;
+    
+}
+
+.message.error {
+    
+    color: #EA9696;
+    
+}
