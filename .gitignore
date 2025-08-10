@@ -77,9 +77,6 @@ StyleCopReport.xml
 *.svclog
 *.scc
 
-# Docker
-.dockerignore
-Dockerfile
 
 # JetBrains Rider
 *.sln.iml
