@@ -4,6 +4,14 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
+      args:
+        - BUILDKIT_INLINE_CACHE=1
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+        reservations:
+          memory: 1G
     container_name: blazor-chat-container
     ports:
       - "8080:80"   # HTTP
