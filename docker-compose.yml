@@ -1,5 +1,4 @@
 version: '3.8'
-
 services:
   blazor-chat-app:
     build:
@@ -10,19 +9,23 @@ services:
       - "8080:80"   # HTTP
       - "8443:443"  # HTTPS
     environment:
-      - ASPNETCORE_ENVIRONMENT=Production
+      - ASPNETCORE_ENVIRONMENT=Development  # שינוי ל-Development לבדיקה
       - ASPNETCORE_URLS=http://+:80
+      - Logging__LogLevel__Default=Debug
+      - Logging__LogLevel__Microsoft=Information
     volumes:
-      - ./data:/app/data  # מיפוי תיקיית המידע לשמירת בסיס הנתונים
+      - ./data:/app/data  # מיפוי תיקיית המידע
+      - ./logs:/app/logs  # הוספת מיפוי ללוגים
     networks:
       - blazor-network
     restart: unless-stopped
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:80/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 60s
+    # הסרת healthcheck זמנית לבדיקה
+    # healthcheck:
+    #   test: ["CMD", "curl", "-f", "http://localhost:80/health"]
+    #   interval: 30s
+    #   timeout: 10s
+    #   retries: 3
+    #   start_period: 60s
 
 networks:
   blazor-network:
