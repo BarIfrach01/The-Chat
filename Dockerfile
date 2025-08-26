@@ -1,10 +1,11 @@
 # Use the official ASP.NET Core runtime image
 FROM mcr.microsoft.com/dotnet/aspnet:6.0 AS base
-
-
 WORKDIR /app
 EXPOSE 80
 EXPOSE 443
+
+# Install curl for health checks (if needed)
+RUN apt-get update && apt-get install -y curl && rm -rf /var/lib/apt/lists/*
 
 # Use the official .NET SDK image for building
 FROM mcr.microsoft.com/dotnet/sdk:6.0 AS build
@@ -34,8 +35,11 @@ FROM base AS final
 WORKDIR /app
 COPY --from=publish /app/publish .
 
-# Create directory for SQLite database
-RUN mkdir -p /app/data
+# Create directories
+RUN mkdir -p /app/data /app/logs
+
+# Set permissions
+RUN chmod 777 /app/data /app/logs
 
 # Set environment variables
 ENV ASPNETCORE_ENVIRONMENT=Production
